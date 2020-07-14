@@ -23,20 +23,20 @@ UART_Controller::~UART_Controller() {
 }
 
 bool UART_Controller::Open() {
-	fd = open(fileNameStr.c_str(), O_RDWR | O_NOCTTY | O_NDELAY); //O_NOCTTY：告訴Linux這個程式不想控制TTY介面，如果不設定這個旗標，有些輸入(例如鍵盤的abort)信號可能影響程式。
-	//O_NDELAY：告訴Linux這個程式不介意RS-232的DCD信號的狀態。如果不設定這個旗標，程式會處於speep狀態，直到RS-232有DCD信號進來。
+	fd = open(fileNameStr.c_str(), O_RDWR | O_NOCTTY | O_NDELAY);
+
 	if (fd < 0) {
 		perror("Can't Open Serial Port");
 		return false;
 	}
-//恢復串口爲阻塞狀態
+	//Lock Serial Port
 	if (fcntl(fd, F_SETFL, 0) < 0) {
 		printf("fcntl failed!\n");
 		return false;
 	} else {
 		printf("fcntl=%d\n", fcntl(fd, F_SETFL, 0));
 	}
-//測試是否爲終端設備
+	//Check Terminal Device
 	if (0 == isatty(STDIN_FILENO)) {
 		printf("standard input is not a terminal device\n");
 		return false;
@@ -52,8 +52,6 @@ void UART_Controller::Close() {
 }
 
 bool UART_Controller::ApplyOption() {
-	int status;
-
 	struct termios options;
 
 	if (tcgetattr(fd, &options) != 0) {
@@ -135,12 +133,13 @@ bool UART_Controller::ApplyOption() {
 		return false;
 
 	}
-	//修改輸出模式，原始數據輸出
+	//Set Output
 	options.c_oflag &= ~OPOST;
 	options.c_lflag &= ~(ICANON | ECHO | ECHOE | ISIG);
 	//options.c_lflag &= ~(ISIG | ICANON);
-	//設置等待時間和最小接收字符
+	//Set WaitTime
 	options.c_cc[VTIME] = 1; /* 讀取一個字符等待1*(1/10)s */
+	//Set Min Receive Bytes
 	options.c_cc[VMIN] = 1; /* 讀取字符的最少個數爲1 */
 	//如果發生數據溢出，接收數據，但是不再讀取 刷新收到的數據但是不讀
 	tcflush(fd, TCIFLUSH);
@@ -180,7 +179,7 @@ int UART_Controller::RecvAsync(char *buffer, int buffer_len,uint8_t sec = 10, ui
 int UART_Controller::RecvAwait(char *buffer, int buffer_len) {
 
 	int len = 0;
-	len = len = read(fd, buffer, buffer_len);
+	len = read(fd, buffer, buffer_len);
 	if(len>=0){
 
 		return len;
